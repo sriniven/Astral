@@ -1,0 +1,120 @@
+Steps that were taken on this machine to install Nutch and verify the installation:
+
+sudo locale-gen UTF-8
+
+Install Java:
+sudo apt-get install default-jdk
+
+Set JAVA_HOME. Add the following line at the end of ~/.bashrc:
+export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:bin/java::")
+
+Install Ant:
+sudo apt-get install ant
+
+Install Nutch according to the following tutorial (details below):
+https://wiki.apache.org/nutch/Nutch2Tutorial
+
+Install Hbase according to the following tutorial (details below):
+http://hbase.apache.org/book.html#quickstart
+
+
+Download and unpack nutch sources:
+wget http://mirror.tcpdiag.net/apache/nutch/2.3/apache-nutch-2.3-src.tar.gz
+tar xzf apache-nutch-2.3-src.tar.gz
+
+Download and unpack Hbase:
+wget http://archive.apache.org/dist/hbase/hbase-0.94.14/hbase-0.94.14.tar.gz
+tar xzf hbase-0.94.14.tar.gz
+
+Edit /home/ubuntu/hbase-0.94.14/conf/hbase-site.xml file so that it looks like this:
+
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+  <property>
+    <name>hbase.rootdir</name>
+    <value>file:///home/ubuntu/hbase-data</value>
+  </property>
+  <property>
+    <name>hbase.zookeeper.property.dataDir</name>
+    <value>/home/ubuntu/zookeeper</value>
+  </property>
+</configuration>
+
+Start Hbase:
+/home/ubuntu/hbase-0.94.14/bin/start-hbase.sh
+
+Edit /home/ubuntu/apache-nutch-2.3/conf/nutch-site.xml file so that it looks like this:
+
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+
+<property>
+ <name>storage.data.store.class</name>
+ <value>org.apache.gora.hbase.store.HBaseStore</value>
+ <description>Default class for storing data</description>
+</property>
+
+<property>
+ <name>http.agent.name</name>
+ <value>My Spider</value>
+</property>
+  
+<property>
+  <name>db.update.additions.allowed</name>
+  <value>false</value>
+  <description>If true, updatedb will add newly discovered URLs, if false
+  only already existing URLs in the CrawlDb will be updated and no new
+  URLs will be added.
+  </description>
+</property>
+
+</configuration>
+
+Open /home/ubuntu/apache-nutch-2.3/ivy/ivy.xml file and uncomment the following line:
+
+<dendency org="org.apache.gora" name="gora-hbase" rev="0.5" conf="*->default" />
+
+Open /home/ubuntu/apache-nutch-2.3/conf/gora.properties and add the following line at the end of the file:
+gora.datastore.default=org.apache.gora.hbase.store.HBaseStore
+
+
+Compile Nutch:
+cd ~/apache-nutch-2.3
+ant runtime
+
+When compiled for the first time, the dependency manager has to download a lot of files. Therefore the compilation may fail if there are network issues. If you get a message BUILD FAILED, try again until you get a message BUILD SUCCESSFUL.
+
+
+Try to run Nutch:
+
+Create a directory ~/seeds and put a text file seeds.txt in it with a couple of seed URLs, one URL per line:
+https://www.yahoo.com
+http://www.nytimes.com
+http://edition.cnn.com
+http://www.bbc.com
+http://www.apache.org
+
+Crawl these seed URLs by invoking the following Nutch commands:
+/home/ubuntu/apache-nutch-2.3/runtime/local/bin/nutch inject /home/ubuntu/seeds -crawlId crawl1
+/home/ubuntu/apache-nutch-2.3/runtime/local/bin/nutch generate -crawlId crawl1 -batchId batch1
+/home/ubuntu/apache-nutch-2.3/runtime/local/bin/nutch fetch batch1 -crawlId crawl1
+/home/ubuntu/apache-nutch-2.3/runtime/local/bin/nutch parse batch1 -crawlId crawl1
+/home/ubuntu/apache-nutch-2.3/runtime/local/bin/nutch updatedb batch1 -crawlId crawl1
+
+
+Check out the crawled data:
+Open Hbase shell:
+/home/ubuntu/hbase-0.94.14/bin/hbase shell
+
+Dump the crawled data by entering the following Hbase command:
+scan 'crawl1_webpage'
+
+Exit the Hbase shell by entering:
+exit
+
