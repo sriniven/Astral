@@ -118,3 +118,48 @@ scan 'crawl1_webpage'
 Exit the Hbase shell by entering:
 exit
 
+Installing Solr
+===============
+
+Download Solr ver. 4.10.3 (this specific version is known to work with Nutch 2.3 that we have installed):
+wget http://mirrors.ibiblio.org/apache/lucene/solr/4.10.3/solr-4.10.3.tgz
+tar xzf solr-4.10.3.tgz
+
+Setup Solr schema:
+cp /home/ubuntu/apache-nutch-2.3/conf/schema.xml /home/ubuntu/solr-4.10.3/example/solr/collection1/conf
+
+Launch Solr:
+/home/ubuntu/solr-4.10.3/bin/solr start -e cloud -noprompt
+
+Add the following entry to /home/ubuntu/apache-nutch-2.3/conf/nutch-site.xml:
+
+<property>
+  <name>plugin.includes</name>
+ <value>protocol-http|urlfilter-regex|parse-(html|tika)|index-(basic|anchor)|indexer-solr|urlnormalizer-(pass|regex|basic)|scoring-opic</value>
+ <description>Regular expression naming plugin directory names to
+  include.  Any plugin not matching this expression is excluded.
+  In any case you need at least include the nutch-extensionpoints plugin. By
+  default Nutch includes crawling just HTML and plain text via HTTP,
+  and basic indexing and search plugins. In order to use HTTPS please enable
+  protocol-httpclient, but be aware of possible intermittent problems with the
+  underlying commons-httpclient library.
+  </description>
+</property>
+
+Recompile Nutch so that this change takes effect:
+cd ~/apache-nutch-2.3
+ant runtime
+
+
+Index the pages that we have crawled:
+/home/ubuntu/apache-nutch-2.3/runtime/local/bin/nutch solrindex http://localhost:8983/solr/ -all -crawlId crawl1
+
+
+Solr listens on port 8983 which is not accessible from the outside world on our server. 
+We have to set up an SSH tunnel to access it from the local machine.
+Open a new terminal window on your local machine and run the following command to set up the tunnel (you may need to edit the path to your pem file):
+ssh -L 18983:localhost:8983 -N -i ~/cheenu/milancheenu.pem ubuntu@ec2-52-25-102-238.us-west-2.compute.amazonaws.com
+
+Run a Solr query and verify that you see crawled data. Open the following URL in your browser and press "Execute Query". You should get search results with three entries:
+http://localhost:18983/solr/#/collection1/query
+
